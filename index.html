@@ -189,7 +189,7 @@ let sale = { percent: 0, name: "" };
        (async()=>{const enc=new TextEncoder();const h=await crypto.subtle.digest('SHA-256', enc.encode('nieuwww'));console.log(Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join(''))})();
    - Then paste the output below.
    =========================== */
-const ADMIN_HASH = "6b3a55e0261b0304143f805a8f2c1b6d5c6f0d9b5f7b9b0b7a72f7b5f8b6d2f3"; // voorbeeld: hash van "demo" (verander)
+const ADMIN_HASH = "13d6598661c603ea5e26809c6f152ee4c80dfc36fd59d1c078c63986f4004204"; // voorbeeld: hash van "demo" (verander)
 
 function sha256hex(str){
   const enc = new TextEncoder();
