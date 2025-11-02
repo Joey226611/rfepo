@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Moderne Digitale Kassa — Demo</title>
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --accent:#7c5cff; --muted:#9aa4b2;
+    --glass: rgba(255,255,255,0.03);
+    --glass2: rgba(255,255,255,0.02);
+    --success: #17c964;
+    --danger: #ff6b6b;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(124,92,255,0.12), transparent 6%),
+    linear-gradient(180deg,#041027 0%, #071827 40%, #07121a 100%); color:#e6eef8;}
+  .wrap{max-width:1200px;margin:36px auto;padding:24px;display:grid;grid-template-columns:380px 1fr;gap:20px}
+  .card{background:linear-gradient(180deg,var(--glass),var(--glass2)); border-radius:14px;padding:18px;box-shadow:0 6px 30px rgba(2,6,23,0.6);backdrop-filter: blur(6px);}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  h1{font-size:18px;margin:0;letter-spacing:0.2px}
+  .muted{color:var(--muted);font-size:13px}
+  /* Products list */
+  .products{display:grid;grid-template-columns:1fr;gap:12px;max-height:62vh;overflow:auto;padding-right:6px}
+  .prod{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;background:linear-gradient(90deg, rgba(255,255,255,0.02), transparent);transition:transform .14s ease, box-shadow .14s;cursor:pointer}
+  .prod:hover{transform:translateY(-6px);box-shadow:0 10px 30px rgba(7,12,30,0.6)}
+  .prod .info{flex:1}
+  .badge{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.03);font-weight:600}
+  .controls{display:flex;gap:8px;align-items:center}
+  button.btn{background:var(--accent);border:none;padding:10px 14px;border-radius:10px;color:white;font-weight:600;cursor:pointer;box-shadow:0 6px 20px rgba(124,92,255,0.14);transition:transform .12s}
+  button.btn:active{transform:scale(.98)}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+  .search{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit;margin-bottom:12px}
+  /* Right column */
+  .right{display:flex;flex-direction:column;gap:14px}
+  .basket{min-height:160px;max-height:56vh;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .item{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px;background:linear-gradient(90deg, rgba(255,255,255,0.01), transparent);border-radius:10px}
+  .item strong{display:block}
+  .qty{display:flex;gap:6px;align-items:center}
+  .qty button{padding:6px 8px;border-radius:8px;border:none;background:rgba(255,255,255,0.02);color:inherit;cursor:pointer}
+  .summary{display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:10px;background:linear-gradient(90deg, rgba(255,255,255,0.01), transparent)}
+  .small{font-size:13px;color:var(--muted)}
+  .big{font-size:20px;font-weight:700}
+  /* Footer controls */
+  .controls-row{display:flex;gap:10px;align-items:center}
+  /* Modal */
+  .modal-back{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:flex;align-items:center;justify-content:center;z-index:40}
+  .modal{max-width:820px;width:96%;padding:20px;border-radius:14px;background:linear-gradient(180deg,#071026, #081026);box-shadow:0 20px 60px rgba(2,6,23,0.8)}
+  .receipt{background:#06111b;padding:18px;border-radius:8px;color:#cfe9ff;max-height:70vh;overflow:auto}
+  .receipt h2{margin:0 0 6px 0}
+  .center{display:flex;justify-content:center}
+  /* Login */
+  .login-card{max-width:420px;margin:60px auto;padding:28px;border-radius:12px;background:linear-gradient(180deg,#071026,#06111b);box-shadow:0 14px 60px rgba(2,6,23,0.7)}
+  input[type="password"], input[type="text"], input[type="number"]{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  /* Print styles */
+  @media print{
+    body{background:white;color:black}
+    .no-print{display:none}
+    .receipt{background:white;color:black}
+  }
+
+  /* subtle float animation for header */
+  .float{animation:float 6s ease-in-out infinite}
+  @keyframes float{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- Login overlay (simple gate) -->
+<div id="loginView" style="min-height:100vh;display:flex;align-items:center;justify-content:center;">
+  <div class="login-card card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><h1 style="margin:0">Kassa Login</h1><div class="muted">Voer het beheerderswachtwoord in.</div></div>
+      <div class="float badge">Demo</div>
+    </div>
+
+    <div style="margin-top:16px">
+      <input id="pwd" type="password" placeholder="Wachtwoord...">
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="loginBtn" class="btn">Inloggen</button>
+        <button id="demoBtn" class="ghost">Demomodus</button>
+      </div>
+      <div class="hint">Wachtwoord is gehashd in de code (SHA-256). Zie documentatie onderaan hoe je veilig toegankelijkheid maakt.</div>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="wrap">
+    <!-- Left: producten -->
+    <div class="card">
+      <header>
+        <div>
+          <h1>Digitale Kassa</h1>
+          <div class="muted">Snel & modern — template-ready</div>
+        </div>
+        <div class="muted">€ prijzen, vaste items</div>
+      </header>
+
+      <input id="search" class="search" placeholder="Zoek product... (type naam of categorie)">
+
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button id="saleBtn" class="btn">Sale toepassen</button>
+        <button id="viewProducts" class="ghost">Bekijk alle producten</button>
+        <button id="clearSale" class="ghost">Verwijder sale</button>
+      </div>
+
+      <div id="products" class="products"></div>
+
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;justify-content:space-between">
+        <div class="small">Template: pas producten aan in de JS bovenaan.</div>
+        <div><button id="logout" class="ghost no-print">Uitloggen</button></div>
+      </div>
+    </div>
+
+    <!-- Right: mandje & bon -->
+    <div class="card right">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><h2 style="margin:0">Bestelling</h2><div class="muted small">Geselecteerde producten</div></div>
+        <div class="muted">Tijd: <span id="timeNow"></span></div>
+      </div>
+
+      <div class="basket" id="basket"></div>
+
+      <div class="summary">
+        <div>
+          <div class="small">Subtotaal</div>
+          <div class="big" id="subtotal">€0.00</div>
+        </div>
+        <div style="text-align:right">
+          <div class="small">Kortingen</div>
+          <div id="saleInfo" class="small">Geen</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <div class="controls-row">
+          <button id="receiptBtn" class="btn">Maak bon</button>
+          <button id="clearBtn" class="ghost">Leeg mandje</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt modal -->
+<div id="modal" style="display:none" class="modal-back no-print">
+  <div class="modal card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <h2>Bon Preview</h2>
+        <div class="muted small" id="receiptDate">—</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="printBtn" class="btn">Print</button>
+        <button id="closeModal" class="ghost">Sluit</button>
+      </div>
+    </div>
+
+    <div class="receipt" id="receiptContent">
+      <!-- Receipt content injected here -->
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===========================
+   CONFIG: product-template (PAS AAN HIER)
+   =========================== */
+const PRODUCTS = [
+  { id: "p01", name: "Cappuccino", price: 3.50, cat: "Drank" },
+  { id: "p02", name: "Latte", price: 3.90, cat: "Drank" },
+  { id: "p03", name: "Broodje Kaas", price: 2.80, cat: "Broodje" },
+  { id: "p04", name: "Sandwich Kip", price: 4.50, cat: "Broodje" },
+  { id: "p05", name: "Water 500ml", price: 1.20, cat: "Drank" },
+  { id: "p06", name: "Donut", price: 1.80, cat: "Snack" },
+];
+// Eenvoudig template: voeg of verwijder objecten hierboven.
+
+let sale = { percent: 0, name: "" };
+
+/* ===========================
+   SIMPLE "LOCK" / PASSWORD (DEMO)
+   - Replace ADMIN_HASH with SHA-256 hex of desired password.
+   - To create a new hash: open browser console and run:
+       (async()=>{const enc=new TextEncoder();const h=await crypto.subtle.digest('SHA-256', enc.encode('nieuwww'));console.log(Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join(''))})();
+   - Then paste the output below.
+   =========================== */
+const ADMIN_HASH = "6b3a55e0261b0304143f805a8f2c1b6d5c6f0d9b5f7b9b0b7a72f7b5f8b6d2f3"; // voorbeeld: hash van "demo" (verander)
+
+function sha256hex(str){
+  const enc = new TextEncoder();
+  return crypto.subtle.digest('SHA-256', enc.encode(str))
+    .then(buf => Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join(''));
+}
+
+/* ===========================
+   APPLICATION STATE
+   =========================== */
+let basket = {}; // id -> {product, qty}
+function addToBasket(prodId){
+  const p = PRODUCTS.find(x=>x.id===prodId); if(!p) return;
+  if(!basket[prodId]) basket[prodId] = { product: p, qty: 0 };
+  basket[prodId].qty++;
+  renderBasket();
+}
+function removeFromBasket(prodId){
+  if(!basket[prodId]) return;
+  basket[prodId].qty--;
+  if(basket[prodId].qty <= 0) delete basket[prodId];
+  renderBasket();
+}
+function setQty(prodId, qty){
+  if(qty<=0){ delete basket[prodId]; } else { basket[prodId].qty = qty; }
+  renderBasket();
+}
+function clearBasket(){ basket = {}; renderBasket(); }
+
+/* ===========================
+   RENDER FUNCTIONS
+   =========================== */
+const el = id => document.getElementById(id);
+
+function renderProducts(filter=""){
+  const box = el('products'); box.innerHTML = "";
+  const q = filter.trim().toLowerCase();
+  const list = PRODUCTS.filter(p => !q || (p.name+p.cat).toLowerCase().includes(q));
+  for(const p of list){
+    const node = document.createElement('div'); node.className='prod';
+    node.innerHTML = `
+      <div class="info">
+        <div style="display:flex;align-items:center;gap:8px"><strong>${p.name}</strong><div class="muted">${p.cat}</div></div>
+        <div class="muted">€${p.price.toFixed(2)}</div>
+      </div>
+      <div class="controls">
+        <div class="badge">€${p.price.toFixed(2)}</div>
+        <button class="ghost" data-id="${p.id}">+ toevoegen</button>
+      </div>
+    `;
+    node.querySelector('button').addEventListener('click', ()=>addToBasket(p.id));
+    box.appendChild(node);
+  }
+}
+
+function renderBasket(){
+  const box = el('basket'); box.innerHTML = "";
+  let subtotal = 0;
+  for(const id of Object.keys(basket)){
+    const it = basket[id];
+    const lineTotal = it.product.price * it.qty;
+    subtotal += lineTotal;
+    const item = document.createElement('div'); item.className='item';
+    item.innerHTML = `
+      <div>
+        <strong>${it.product.name}</strong>
+        <div class="muted">€${it.product.price.toFixed(2)} × ${it.qty} = €${lineTotal.toFixed(2)}</div>
+      </div>
+      <div class="qty">
+        <button data-act="dec" data-id="${id}">−</button>
+        <div class="muted">${it.qty}</div>
+        <button data-act="inc" data-id="${id}">+</button>
+      </div>
+    `;
+    item.querySelector('[data-act="inc"]').addEventListener('click', ()=>{ addToBasket(id); });
+    item.querySelector('[data-act="dec"]').addEventListener('click', ()=>{ removeFromBasket(id); });
+    box.appendChild(item);
+  }
+  el('subtotal').textContent = `€${subtotal.toFixed(2)}`;
+  if(sale && sale.percent>0){
+    el('saleInfo').textContent = `${sale.name} — ${sale.percent}%`;
+  } else { el('saleInfo').textContent = 'Geen'; }
+}
+
+function calcTotals(){
+  let subtotal = 0;
+  for(const id of Object.keys(basket)){
+    const it = basket[id]; subtotal += it.product.price * it.qty;
+  }
+  const discount = sale.percent>0 ? subtotal * (sale.percent/100) : 0;
+  const total = subtotal - discount;
+  return { subtotal, discount, total };
+}
+
+/* ===========================
+   Receipt generation & print
+   =========================== */
+function openReceipt(){
+  const {subtotal, discount, total} = calcTotals();
+  const date = new Date();
+  el('receiptDate').textContent = date.toLocaleString();
+  const receipt = el('receiptContent');
+  receipt.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div><h2 style="margin:0">Mijn Winkel</h2><div class="muted small">Kassa</div></div>
+      <div class="small">Tijd: ${date.toLocaleString()}</div>
+    </div>
+    <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.05);margin:8px 0">
+    <div>
+      ${Object.keys(basket).map(id=>{
+        const it = basket[id];
+        const name = it.product.name;
+        const line = `<div style="display:flex;justify-content:space-between;margin:6px 0"><div>${it.qty} × ${name}</div><div>€${(it.product.price*it.qty).toFixed(2)}</div></div>`;
+        return line;
+      }).join('')}
+    </div>
+    <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.05);margin:8px 0">
+    <div style="display:flex;justify-content:space-between"><div>Subtotaal</div><div>€${subtotal.toFixed(2)}</div></div>
+    <div style="display:flex;justify-content:space-between"><div>Korting ${sale.percent>0?`(${sale.name})`:''}</div><div>€${discount.toFixed(2)}</div></div>
+    <div style="display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-top:8px"><div>Totaal</div><div>€${total.toFixed(2)}</div></div>
+    <div style="margin-top:12px" class="muted small">Dank voor uw aankoop — Powered by Demo Kassa</div>
+  `;
+  el('modal').style.display = 'flex';
+}
+
+function closeReceipt(){ el('modal').style.display = 'none'; }
+
+/* ===========================
+   UI wiring
+   =========================== */
+document.addEventListener('click', (e)=>{
+  if(e.target.id === 'closeModal' || e.target.id === 'modal') closeReceipt();
+});
+
+el('saleBtn').addEventListener('click', ()=>{
+  const pct = parseFloat(prompt("Voer kortingspercentage in (heel getal):", "10"));
+  if(isNaN(pct) || pct<=0){ alert("Ongeldige korting."); return; }
+  const name = prompt("Naam van de sale (bijv. WINTER10):", "SALE");
+  sale = { percent: Math.round(pct), name: name || "SALE" };
+  renderBasket();
+});
+
+el('clearSale').addEventListener('click', ()=>{
+  sale = { percent:0, name:"" }; renderBasket();
+});
+
+el('receiptBtn').addEventListener('click', ()=>{
+  if(Object.keys(basket).length===0){ alert("Mandje is leeg."); return; }
+  openReceipt();
+});
+
+el('printBtn').addEventListener('click', ()=>{
+  // print only the receipt content in a new window for nicer layout
+  const w = window.open('','_blank','width=600,height=800');
+  w.document.write('<html><head><title>Bon</title>');
+  w.document.write('<style>body{font-family:Arial,Helvetica,sans-serif;padding:20px;color:#000} .muted{color:#666}</style>');
+  w.document.write('</head><body>');
+  w.document.write(el('receiptContent').innerHTML);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.focus();
+  setTimeout(()=>{ w.print(); }, 300);
+});
+
+el('closeModal').addEventListener('click', closeReceipt);
+el('clearBtn').addEventListener('click', ()=>{ if(confirm("Leeg mandje?")) clearBasket(); });
+el('search').addEventListener('input', (ev)=>renderProducts(ev.target.value));
+el('logout').addEventListener('click', ()=>{ if(confirm("Uitloggen?")) { localStorage.removeItem('kassaLogged'); location.reload(); } });
+
+/* ===========================
+   Time & Init
+   =========================== */
+function tickTime(){ el('timeNow').textContent = new Date().toLocaleTimeString(); }
+tickTime(); setInterval(tickTime, 1000);
+
+renderProducts();
+renderBasket();
+
+/* ===========================
+   Simple login handling (DEMO)
+   - Demo: if localStorage.kassaLogged === "1" show app.
+   - Otherwise require password.
+   =========================== */
+const loginView = el('loginView'), appView = el('app');
+
+function showApp(){ loginView.style.display='none'; appView.style.display='block'; localStorage.setItem('kassaLogged','1'); }
+function showLogin(){ loginView.style.display='flex'; appView.style.display='none'; }
+
+if(localStorage.getItem('kassaLogged')==='1'){ showApp(); } else { showLogin(); }
+
+el('loginBtn').addEventListener('click', async ()=>{
+  const p = el('pwd').value || '';
+  if(!p){ alert('Vul wachtwoord in'); return; }
+  const h = await sha256hex(p);
+  if(h === ADMIN_HASH){ showApp(); } else { alert('Wachtwoord onjuist'); }
+});
+
+// demo button (voor testen zonder wachtwoord)
+el('demoBtn').addEventListener('click', ()=>{
+  if(confirm("Start demomodus (geen security)?")) { showApp(); }
+});
+
+/* Optional: allow pressing Enter to login */
+el('pwd').addEventListener('keydown', (e)=>{ if(e.key==='Enter') el('loginBtn').click(); });
+
+</script>
+
+<!-- Footer uitleg -->
+<div style="max-width:1000px;margin:18px auto 60px;color:var(--muted);font-size:13px;padding:0 22px">
+  <strong>Uitleg & veiligheid</strong>
+  <ul>
+    <li>Dit is een *client-side demo*. Het wachtwoord wordt geverifieerd door te vergelijken met een <em>hash</em> in de code — dit is handig voor demo's maar **niet veilig** voor gevoelige omgevingen.</li>
+    <li>Als je echt wil dat anderen de bron niet kunnen zien: <strong>zet alle gevoelige logica en secrets op een server</strong> (bijv. Firebase Functions, Netlify Functions, of een kleine VPS) en laat de client alleen UI-data ophalen via veilige API's.</li>
+    <li>Als alternatief kun je je site hosten achter een toegangslaag (bijv. Netlify/Cloudflare Access) of gebruikmaken van GitHub private repo (aanbevolen wanneer ontwikkeld). Obfuscation/minification helpt tegen casual nieuwsgierigen maar is geen echte beveiliging.</li>
+    <li>Wil je dat ik help met: (A) een eenvoudige serverless auth (Firebase) + opslag, of (B) een build-stap (minify/obfuscate) die je lokaal draait vóór upload? Zeg wat je wil en ik geef stappen.</li>
+  </ul>
+</div>
+</body>
+</html>
